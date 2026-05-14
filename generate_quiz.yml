@@ -1,0 +1,49 @@
+name: 時事クイズ自動生成
+
+on:
+  # 毎朝7時（JST）= UTC 22:00 に自動実行
+  schedule:
+    - cron: '0 22 * * *'
+
+  # 手動でも実行できる
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: '手動実行の理由'
+        required: false
+        default: '手動トリガー'
+
+jobs:
+  generate-quiz:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # リポジトリへのプッシュ権限
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 をセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 依存パッケージをインストール
+        run: |
+          pip install feedparser requests
+
+      - name: クイズ生成スクリプトを実行
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
+          GIST_ID:        ${{ secrets.GIST_ID }}
+        run: |
+          python generate_quiz.py
+
+      - name: 生成された問題ファイルをコミット & プッシュ
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Actions Bot"
+          git add quiz_data/
+          git diff --staged --quiet || git commit -m "🗞️ 自動生成: $(date +'%Y-%m-%d') の時事クイズ"
+          git push
